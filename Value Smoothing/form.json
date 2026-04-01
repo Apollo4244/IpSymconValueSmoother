@@ -32,7 +32,7 @@
                 },
                 {
                     "name": "ClampEnabled",
-                    "caption": "Clamping",
+                    "caption": "Range Filter",
                     "width": "100px",
                     "add": false,
                     "edit": {

@@ -61,12 +61,21 @@ class ValueSmoothing extends IPSModule
                 continue;
             }
 
-            // Copy profile from source variable (custom profile takes display priority)
-            $profile = $varInfo['VariableCustomProfile'] ?: $varInfo['VariableProfile'] ?: '';
-            $name    = IPS_GetName($sourceVarId);
-            $ident   = 'EMA_' . $sourceVarId;
+            $name  = IPS_GetName($sourceVarId);
+            $ident = 'EMA_' . $sourceVarId;
 
-            $this->MaintainVariable($ident, $name, $varType, $profile, $position, true);
+            // Determine presentation mode: new-style (>= 8.0) or legacy profile
+            $customPresentation = IPS_GetVariablePresentation($sourceVarId);
+            if (!empty($customPresentation)) {
+                // New-style presentation — MaintainVariable needs no profile, apply afterwards
+                $this->MaintainVariable($ident, $name, $varType, '', $position, true);
+                $emaVarId = $this->GetIDForIdent($ident);
+                IPS_SetVariableCustomPresentation($emaVarId, $customPresentation);
+            } else {
+                // Legacy profile-based presentation
+                $profile = $varInfo['VariableCustomProfile'] ?: $varInfo['VariableProfile'] ?: '';
+                $this->MaintainVariable($ident, $name, $varType, $profile, $position, true);
+            }
             $this->RegisterMessage($sourceVarId, VM_UPDATE);
 
             $newIds[] = $sourceVarId;
@@ -160,7 +169,13 @@ class ValueSmoothing extends IPSModule
         }
 
         $rawValue = (float) GetValue($sourceVarId);
-        $messwert = $clampEnabled ? max($clampMin, min($clampMax, $rawValue)) : $rawValue;
+
+        // Range filter: skip values outside the configured range entirely (e.g. Modbus read errors)
+        if ($clampEnabled && ($rawValue < $clampMin || $rawValue > $clampMax)) {
+            return;
+        }
+
+        $messwert = $rawValue;
 
         // Cold start (tAlt = 0.0): jump directly to the first measurement
         $alpha  = ($tAlt === 0.0) ? 1.0 : 1.0 - exp(-$deltaT / $tau);

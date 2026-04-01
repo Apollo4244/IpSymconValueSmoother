@@ -17,7 +17,7 @@ Smoothes variable values using Exponential Moving Average (EMA). Automatically c
 
 ### 2. Requirements
 
-- Symcon version 7.1 or higher
+- Symcon version 8.0 or higher
 
 ### 3. Software Installation
 
