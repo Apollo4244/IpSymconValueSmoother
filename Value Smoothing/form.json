@@ -66,12 +66,12 @@
     "status": [
         {
             "code": 102,
-            "icon": "Active",
+            "icon": "active",
             "caption": "Active"
         },
         {
             "code": 104,
-            "icon": "Inactive",
+            "icon": "inactive",
             "caption": "No variables configured"
         }
     ]
