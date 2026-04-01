@@ -1,0 +1,12 @@
+{
+    "id": "{49DE2C49-B0B2-8343-59BA-37195291133D}",
+    "name": "EMA Value Smoother",
+    "author": "Apolleon Phoibos",
+    "url": "https://github.com/Apollo4244/IpSymconValueSmoother",
+    "compatibility": {
+        "version": "7.1"
+    },
+    "version": "1.0",
+    "build": 0,
+    "date": 0
+}

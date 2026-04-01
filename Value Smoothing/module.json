@@ -1,0 +1,12 @@
+{
+    "id": "{B8E8E933-E27F-D1EF-A183-981C982C5870}",
+    "name": "Value Smoothing",
+    "type": 3,
+    "vendor": "",
+    "aliases": [],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "VALUESMOOTHING",
+    "url": "https://github.com/Apollo4244/IpSymconValueSmoother"
+}
