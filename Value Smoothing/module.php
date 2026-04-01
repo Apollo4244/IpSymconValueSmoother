@@ -1,23 +1,180 @@
 <?php
 
 declare(strict_types=1);
-	class ValueSmoothing extends IPSModule
-	{
-		public function Create()
-		{
-			//Never delete this line!
-			parent::Create();
-		}
 
-		public function Destroy()
-		{
-			//Never delete this line!
-			parent::Destroy();
-		}
+/**
+ * ValueSmoothing
+ *
+ * Smooths variable values using Exponential Moving Average (EMA).
+ * Automatically creates and maintains smoothed child variables for each
+ * configured source variable. The EMA time constant τ is configurable
+ * per variable. An internal decay timer ensures the EMA converges to zero
+ * even when the source variable stops firing update events.
+ */
+class ValueSmoothing extends IPSModule
+{
+    private const DECAY_TIMER_MS = 5000; // Fixed decay check interval: 5 s
+    private const TAU_MIN        = 10;   // Minimum τ in seconds
+    private const TAU_MAX        = 300;  // Maximum τ in seconds
 
-		public function ApplyChanges()
-		{
-			//Never delete this line!
-			parent::ApplyChanges();
-		}
-	}
+    public function Create(): void
+    {
+        parent::Create();
+
+        $this->RegisterPropertyString('Variables', '[]');
+        $this->RegisterAttributeString('RegisteredVarIds', '[]');
+        $this->RegisterAttributeString('LastTimestamps', '{}');
+
+        $this->RegisterTimer('DecayTimer', 0, 'VALUESMOOTHING_DecayTick(' . $this->InstanceID . ');');
+    }
+
+    public function Destroy(): void
+    {
+        parent::Destroy();
+    }
+
+    public function ApplyChanges(): void
+    {
+        parent::ApplyChanges();
+
+        // Unregister all previously tracked VM_UPDATE messages
+        $prevIds = json_decode($this->ReadAttributeString('RegisteredVarIds'), true) ?? [];
+        foreach ($prevIds as $varId) {
+            $this->UnregisterMessage((int) $varId, VM_UPDATE);
+        }
+
+        $variables = json_decode($this->ReadPropertyString('Variables'), true) ?? [];
+        $newIds    = [];
+        $position  = 1;
+
+        foreach ($variables as $entry) {
+            $sourceVarId = (int) ($entry['SourceVarId'] ?? 0);
+            if ($sourceVarId === 0 || !IPS_VariableExists($sourceVarId)) {
+                continue;
+            }
+
+            $varInfo = IPS_GetVariable($sourceVarId);
+            $varType = $varInfo['VariableType'];
+
+            // EMA is only meaningful for numeric types
+            if ($varType !== VARIABLETYPE_FLOAT && $varType !== VARIABLETYPE_INTEGER) {
+                continue;
+            }
+
+            // Copy profile from source variable (custom profile takes display priority)
+            $profile = $varInfo['VariableCustomProfile'] ?: $varInfo['VariableProfile'] ?: '';
+            $name    = IPS_GetName($sourceVarId);
+            $ident   = 'EMA_' . $sourceVarId;
+
+            $this->MaintainVariable($ident, $name, $varType, $profile, $position, true);
+            $this->RegisterMessage($sourceVarId, VM_UPDATE);
+
+            $newIds[] = $sourceVarId;
+            $position++;
+        }
+
+        // Delete EMA variables and timestamps that are no longer in the configuration
+        $timestamps = json_decode($this->ReadAttributeString('LastTimestamps'), true) ?? [];
+        foreach ($prevIds as $varId) {
+            if (!in_array((int) $varId, $newIds, true)) {
+                $this->MaintainVariable('EMA_' . $varId, '', VARIABLETYPE_FLOAT, '', 0, false);
+                unset($timestamps[(string) $varId]);
+            }
+        }
+        $this->WriteAttributeString('LastTimestamps', json_encode($timestamps));
+
+        $this->WriteAttributeString('RegisteredVarIds', json_encode($newIds));
+
+        if (count($newIds) === 0) {
+            $this->SetTimerInterval('DecayTimer', 0);
+            $this->SetStatus(104); // Inactive: no variables configured
+        } else {
+            $this->SetTimerInterval('DecayTimer', self::DECAY_TIMER_MS);
+            $this->SetStatus(102); // Active
+        }
+    }
+
+    public function MessageSink($timestamp, $senderID, $message, $data): void
+    {
+        if ($message === VM_UPDATE) {
+            $this->ProcessEMA((int) $senderID, false);
+        }
+    }
+
+    /**
+     * Called by the internal decay timer (every DECAY_TIMER_MS).
+     * Drives EMA decay for source variables that have stopped firing updates.
+     */
+    public function DecayTick(): void
+    {
+        $variables = json_decode($this->ReadPropertyString('Variables'), true) ?? [];
+        foreach ($variables as $entry) {
+            $sourceVarId = (int) ($entry['SourceVarId'] ?? 0);
+            if ($sourceVarId > 0 && IPS_VariableExists($sourceVarId)) {
+                $this->ProcessEMA($sourceVarId, true);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private function ProcessEMA(int $sourceVarId, bool $isDecay): void
+    {
+        // Locate the configuration entry for this source variable
+        $variables = json_decode($this->ReadPropertyString('Variables'), true) ?? [];
+        $entry     = null;
+        foreach ($variables as $e) {
+            if ((int) ($e['SourceVarId'] ?? 0) === $sourceVarId) {
+                $entry = $e;
+                break;
+            }
+        }
+        if ($entry === null) {
+            return;
+        }
+
+        $tau          = (float) max(self::TAU_MIN, min(self::TAU_MAX, (float) ($entry['Tau'] ?? 30)));
+        $clampEnabled = (bool) ($entry['ClampEnabled'] ?? false);
+        $clampMin     = (float) ($entry['ClampMin'] ?? -50000);
+        $clampMax     = (float) ($entry['ClampMax'] ?? 50000);
+
+        $emaVarId = @$this->GetIDForIdent('EMA_' . $sourceVarId);
+        if (!$emaVarId) {
+            return;
+        }
+
+        // Read current EMA state from the smoothed variable itself
+        $emaAlt = (float) GetValue($emaVarId);
+
+        // Use per-variable microtime timestamps for sub-second precision
+        $timestamps = json_decode($this->ReadAttributeString('LastTimestamps'), true) ?? [];
+        $tAlt       = (float) ($timestamps[(string) $sourceVarId] ?? 0.0);
+        $tNow       = microtime(true);
+        $deltaT     = ($tAlt > 0.0) ? max(0.001, $tNow - $tAlt) : 0.0;
+
+        // Decay tick: skip if the EMA was processed recently — MessageSink handles active sources.
+        if ($isDecay && $tAlt > 0.0 && $deltaT < ($tau / 2)) {
+            return;
+        }
+
+        $rawValue = (float) GetValue($sourceVarId);
+        $messwert = $clampEnabled ? max($clampMin, min($clampMax, $rawValue)) : $rawValue;
+
+        // Cold start (tAlt = 0.0): jump directly to the first measurement
+        $alpha  = ($tAlt === 0.0) ? 1.0 : 1.0 - exp(-$deltaT / $tau);
+        $emaNeu = $alpha * $messwert + (1.0 - $alpha) * $emaAlt;
+
+        $varType = IPS_GetVariable($sourceVarId)['VariableType'];
+        if ($varType === VARIABLETYPE_INTEGER) {
+            SetValueInteger($emaVarId, (int) round($emaNeu));
+        } else {
+            SetValueFloat($emaVarId, round($emaNeu, 1));
+        }
+
+        // Persist the microtime timestamp for next call
+        $timestamps[(string) $sourceVarId] = $tNow;
+        $this->WriteAttributeString('LastTimestamps', json_encode($timestamps));
+    }
+}

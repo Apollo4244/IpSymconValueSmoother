@@ -1,6 +1,14 @@
 {
     "translations": {
         "de": {
+            "Variables": "Variablen",
+            "Source Variable": "Quell-Variable",
+            "τ (s)": "τ (s)",
+            "Clamping": "Begrenzung",
+            "Min": "Min",
+            "Max": "Max",
+            "Active": "Aktiv",
+            "No variables configured": "Keine Variablen konfiguriert"
         }
     }
 }

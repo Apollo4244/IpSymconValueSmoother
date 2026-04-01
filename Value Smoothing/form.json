@@ -1,5 +1,78 @@
 {
-    "elements": [],
+    "elements": [
+        {
+            "type": "List",
+            "name": "Variables",
+            "caption": "Variables",
+            "rowCount": 8,
+            "add": true,
+            "delete": true,
+            "columns": [
+                {
+                    "name": "SourceVarId",
+                    "caption": "Source Variable",
+                    "width": "auto",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectVariable",
+                        "validVariableTypes": [1, 2]
+                    }
+                },
+                {
+                    "name": "Tau",
+                    "caption": "τ (s)",
+                    "width": "90px",
+                    "add": 30,
+                    "edit": {
+                        "type": "NumberSpinner",
+                        "minimum": 10,
+                        "maximum": 300,
+                        "suffix": " s"
+                    }
+                },
+                {
+                    "name": "ClampEnabled",
+                    "caption": "Clamping",
+                    "width": "100px",
+                    "add": false,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "name": "ClampMin",
+                    "caption": "Min",
+                    "width": "100px",
+                    "add": -50000,
+                    "edit": {
+                        "type": "NumberSpinner",
+                        "digits": 1
+                    }
+                },
+                {
+                    "name": "ClampMax",
+                    "caption": "Max",
+                    "width": "100px",
+                    "add": 50000,
+                    "edit": {
+                        "type": "NumberSpinner",
+                        "digits": 1
+                    }
+                }
+            ]
+        }
+    ],
     "actions": [],
-    "status": []
+    "status": [
+        {
+            "code": 102,
+            "icon": "Active",
+            "caption": "Active"
+        },
+        {
+            "code": 104,
+            "icon": "Inactive",
+            "caption": "No variables configured"
+        }
+    ]
 }
