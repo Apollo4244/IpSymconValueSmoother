@@ -31,7 +31,7 @@
                     }
                 },
                 {
-                    "name": "ClampEnabled",
+                    "name": "RangeFilterEnabled",
                     "caption": "Range Filter",
                     "width": "100px",
                     "add": false,
@@ -40,7 +40,7 @@
                     }
                 },
                 {
-                    "name": "ClampMin",
+                    "name": "RangeMin",
                     "caption": "Min",
                     "width": "100px",
                     "add": -50000,
@@ -50,7 +50,7 @@
                     }
                 },
                 {
-                    "name": "ClampMax",
+                    "name": "RangeMax",
                     "caption": "Max",
                     "width": "100px",
                     "add": 50000,

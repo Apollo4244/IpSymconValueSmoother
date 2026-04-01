@@ -145,9 +145,9 @@ class ValueSmoothing extends IPSModule
         }
 
         $tau          = (float) max(self::TAU_MIN, min(self::TAU_MAX, (float) ($entry['Tau'] ?? 30)));
-        $clampEnabled = (bool) ($entry['ClampEnabled'] ?? false);
-        $clampMin     = (float) ($entry['ClampMin'] ?? -50000);
-        $clampMax     = (float) ($entry['ClampMax'] ?? 50000);
+        $rangeFilterEnabled = (bool) ($entry['RangeFilterEnabled'] ?? false);
+        $rangeMin         = (float) ($entry['RangeMin'] ?? -50000);
+        $rangeMax         = (float) ($entry['RangeMax'] ?? 50000);
 
         $emaVarId = @$this->GetIDForIdent('EMA_' . $sourceVarId);
         if (!$emaVarId) {
@@ -171,7 +171,7 @@ class ValueSmoothing extends IPSModule
         $rawValue = (float) GetValue($sourceVarId);
 
         // Range filter: skip values outside the configured range entirely (e.g. Modbus read errors)
-        if ($clampEnabled && ($rawValue < $clampMin || $rawValue > $clampMax)) {
+        if ($rangeFilterEnabled && ($rawValue < $rangeMin || $rawValue > $rangeMax)) {
             return;
         }
 
