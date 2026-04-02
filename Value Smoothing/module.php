@@ -24,6 +24,7 @@ class ValueSmoothing extends IPSModule
         $this->RegisterPropertyString('Variables', '[]');
         $this->RegisterAttributeString('RegisteredVarIds', '[]');
         $this->RegisterAttributeString('LastTimestamps', '{}');
+        $this->RegisterAttributeString('EMAValues', '{}');
 
         $this->RegisterTimer('DecayTimer', 0, 'VALUESMOOTHING_DecayTick(' . $this->InstanceID . ');');
     }
@@ -82,15 +83,18 @@ class ValueSmoothing extends IPSModule
             $position++;
         }
 
-        // Delete EMA variables and timestamps that are no longer in the configuration
+        // Delete EMA variables, timestamps and stored EMA values that are no longer in the configuration
         $timestamps = json_decode($this->ReadAttributeString('LastTimestamps'), true) ?? [];
+        $emaValues  = json_decode($this->ReadAttributeString('EMAValues'), true) ?? [];
         foreach ($prevIds as $varId) {
             if (!in_array((int) $varId, $newIds, true)) {
                 $this->MaintainVariable('EMA_' . $varId, '', VARIABLETYPE_FLOAT, '', 0, false);
                 unset($timestamps[(string) $varId]);
+                unset($emaValues[(string) $varId]);
             }
         }
         $this->WriteAttributeString('LastTimestamps', json_encode($timestamps));
+        $this->WriteAttributeString('EMAValues', json_encode($emaValues));
 
         $this->WriteAttributeString('RegisteredVarIds', json_encode($newIds));
 
@@ -154,8 +158,9 @@ class ValueSmoothing extends IPSModule
             return;
         }
 
-        // Read current EMA state from the smoothed variable itself
-        $emaAlt = (float) GetValue($emaVarId);
+        // Read full-precision EMA state from internal attribute (not from the rounded display variable)
+        $emaValues = json_decode($this->ReadAttributeString('EMAValues'), true) ?? [];
+        $emaAlt    = (float) ($emaValues[(string) $sourceVarId] ?? 0.0);
 
         // Use per-variable microtime timestamps for sub-second precision
         $timestamps = json_decode($this->ReadAttributeString('LastTimestamps'), true) ?? [];
@@ -188,8 +193,10 @@ class ValueSmoothing extends IPSModule
             SetValueFloat($emaVarId, round($emaNeu, 1));
         }
 
-        // Persist the microtime timestamp for next call
+        // Persist full-precision EMA value and microtime timestamp for next call
+        $emaValues[(string) $sourceVarId]  = $emaNeu;
         $timestamps[(string) $sourceVarId] = $tNow;
+        $this->WriteAttributeString('EMAValues', json_encode($emaValues));
         $this->WriteAttributeString('LastTimestamps', json_encode($timestamps));
     }
 }
