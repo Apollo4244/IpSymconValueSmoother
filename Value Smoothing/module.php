@@ -168,8 +168,9 @@ class ValueSmoothing extends IPSModule
         $tNow       = microtime(true);
         $deltaT     = ($tAlt > 0.0) ? max(0.001, $tNow - $tAlt) : 0.0;
 
-        // Decay tick: skip if the EMA was processed recently — MessageSink handles active sources.
-        if ($isDecay && $tAlt > 0.0 && $deltaT < ($tau / 2)) {
+        // Decay tick: skip if the EMA was processed very recently — MessageSink handles active sources.
+        // Guard is based on the decay timer interval to avoid double-processing, not on τ.
+        if ($isDecay && $tAlt > 0.0 && $deltaT < (self::DECAY_TIMER_MS / 1000 * 0.9)) {
             return;
         }
 
