@@ -13,15 +13,16 @@ declare(strict_types=1);
  */
 class ValueSmoothing extends IPSModule
 {
-    private const DECAY_TIMER_MS = 5000; // Fixed decay check interval: 5 s
-    private const TAU_MIN        = 10;   // Minimum τ in seconds
-    private const TAU_MAX        = 300;  // Maximum τ in seconds
+    private const DECAY_INTERVAL_DEFAULT = 5000; // Default decay check interval: 5 s
+    private const TAU_MIN                = 10;   // Minimum τ in seconds
+    private const TAU_MAX                = 300;  // Maximum τ in seconds
 
     public function Create(): void
     {
         parent::Create();
 
         $this->RegisterPropertyString('Variables', '[]');
+        $this->RegisterPropertyInteger('DecayInterval', self::DECAY_INTERVAL_DEFAULT);
         $this->RegisterAttributeString('RegisteredVarIds', '[]');
         $this->RegisterAttributeString('LastTimestamps', '{}');
         $this->RegisterAttributeString('EMAValues', '{}');
@@ -98,11 +99,12 @@ class ValueSmoothing extends IPSModule
 
         $this->WriteAttributeString('RegisteredVarIds', json_encode($newIds));
 
+        $decayIntervalMs = max(1000, min(10000, $this->ReadPropertyInteger('DecayInterval')));
         if (count($newIds) === 0) {
             $this->SetTimerInterval('DecayTimer', 0);
             $this->SetStatus(104); // Inactive: no variables configured
         } else {
-            $this->SetTimerInterval('DecayTimer', self::DECAY_TIMER_MS);
+            $this->SetTimerInterval('DecayTimer', $decayIntervalMs);
             $this->SetStatus(102); // Active
         }
     }
@@ -148,10 +150,10 @@ class ValueSmoothing extends IPSModule
             return;
         }
 
-        $tau          = (float) max(self::TAU_MIN, min(self::TAU_MAX, (float) ($entry['Tau'] ?? 30)));
+        $tau                = (float) max(self::TAU_MIN, min(self::TAU_MAX, (float) ($entry['Tau'] ?? 30)));
         $rangeFilterEnabled = (bool) ($entry['RangeFilterEnabled'] ?? false);
-        $rangeMin         = (float) ($entry['RangeMin'] ?? -50000);
-        $rangeMax         = (float) ($entry['RangeMax'] ?? 50000);
+        $rangeMin           = (float) ($entry['RangeMin'] ?? 0.0);
+        $rangeMax           = (float) ($entry['RangeMax'] ?? 0.0);
 
         $emaVarId = @$this->GetIDForIdent('EMA_' . $sourceVarId);
         if (!$emaVarId) {
@@ -169,8 +171,9 @@ class ValueSmoothing extends IPSModule
         $deltaT     = ($tAlt > 0.0) ? max(0.001, $tNow - $tAlt) : 0.0;
 
         // Decay tick: skip if the EMA was processed very recently — MessageSink handles active sources.
-        // Guard is based on the decay timer interval to avoid double-processing, not on τ.
-        if ($isDecay && $tAlt > 0.0 && $deltaT < (self::DECAY_TIMER_MS / 1000 * 0.9)) {
+        // Guard is based on the configured decay interval to avoid double-processing, not on τ.
+        $decayIntervalS = max(1000, min(10000, $this->ReadPropertyInteger('DecayInterval'))) / 1000;
+        if ($isDecay && $tAlt > 0.0 && $deltaT < ($decayIntervalS * 0.9)) {
             return;
         }
 

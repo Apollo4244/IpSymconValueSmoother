@@ -4,7 +4,7 @@
             "type": "List",
             "name": "Variables",
             "caption": "Variables",
-            "rowCount": 8,
+            "rowCount": 16,
             "add": true,
             "delete": true,
             "columns": [
@@ -43,7 +43,7 @@
                     "name": "RangeMin",
                     "caption": "Min",
                     "width": "100px",
-                    "add": -50000,
+                    "add": 0,
                     "edit": {
                         "type": "NumberSpinner",
                         "digits": 1
@@ -62,7 +62,17 @@
             ]
         }
     ],
-    "actions": [],
+    "actions": [
+        {
+            "type": "NumberSpinner",
+            "name": "DecayInterval",
+            "caption": "Decay Timer Interval",
+            "minimum": 1000,
+            "maximum": 10000,
+            "steps": 1000,
+            "suffix": " ms"
+        }
+    ],
     "status": [
         {
             "code": 102,

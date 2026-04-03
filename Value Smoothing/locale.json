@@ -8,6 +8,7 @@
             "Min": "Min",
             "Max": "Max",
             "Active": "Aktiv",
+            "Decay Timer Interval": "Decay-Timer-Intervall",
             "No variables configured": "Keine Variablen konfiguriert"
         }
     }
