@@ -60,9 +60,7 @@
                     }
                 }
             ]
-        }
-    ],
-    "actions": [
+        },
         {
             "type": "NumberSpinner",
             "name": "DecayInterval",
@@ -73,6 +71,7 @@
             "suffix": " ms"
         }
     ],
+    "actions": [],
     "status": [
         {
             "code": 102,
