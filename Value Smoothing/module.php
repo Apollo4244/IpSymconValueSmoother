@@ -190,11 +190,27 @@ class ValueSmoothing extends IPSModule
         $alpha  = ($tAlt === 0.0) ? 1.0 : 1.0 - exp(-$deltaT / $tau);
         $emaNeu = $alpha * $messwert + (1.0 - $alpha) * $emaAlt;
 
-        $varType = IPS_GetVariable($sourceVarId)['VariableType'];
+        $varInfo = IPS_GetVariable($sourceVarId);
+        $varType = $varInfo['VariableType'];
         if ($varType === VARIABLETYPE_INTEGER) {
             SetValueInteger($emaVarId, (int) round($emaNeu));
         } else {
-            SetValueFloat($emaVarId, round($emaNeu, 1));
+            $digits = 1; // fallback
+            $presentation = IPS_GetVariablePresentation($sourceVarId);
+            if (!empty($presentation)) {
+                switch ($presentation['PRESENTATION']) {
+                    case VARIABLE_PRESENTATION_LEGACY:
+                        $profileName = $varInfo['VariableCustomProfile'] ?: $varInfo['VariableProfile'];
+                        if ($profileName !== '' && IPS_VariableProfileExists($profileName)) {
+                            $digits = IPS_GetVariableProfile($profileName)['Digits'];
+                        }
+                        break;
+                    case VARIABLE_PRESENTATION_SLIDER:
+                        $digits = $presentation['DIGITS'];
+                        break;
+                }
+            }
+            SetValueFloat($emaVarId, round($emaNeu, $digits));
         }
 
         // Persist full-precision EMA value and microtime timestamp for next call
